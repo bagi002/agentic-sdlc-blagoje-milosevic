@@ -1,0 +1,24 @@
+@startuml c4-component-identity
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Trading Card Game - Identity Context - Component Diagram
+
+Container(api_client, "Flask API", "Python 3.12 / Flask", "Entry point for all HTTP requests")
+ContainerDb(db, "SQLite Database", "SQLite 3", "players table")
+
+Container_Boundary(identity, "Identity Bounded Context") {
+    Component(auth_routes, "Auth Blueprint", "Flask Blueprint", "Exposes POST /auth/register and POST /auth/login")
+    Component(auth_service, "AuthService", "Python class", "Orchestrates registration and login: validates input, delegates to repository and token service")
+    Component(player_repo, "PlayerRepository", "Python class", "Reads and writes the players table; maps rows to Player entities")
+    Component(token_service, "TokenService", "Python class", "Issues and verifies signed JWTs (HS256) using PyJWT")
+    Component(player_entity, "Player", "Python dataclass", "Entity: player_id, username, hashed_password")
+}
+
+Rel(api_client, auth_routes, "Routes /auth/* to")
+Rel(auth_routes, auth_service, "Calls")
+Rel(auth_service, player_repo, "Uses")
+Rel(auth_service, token_service, "Uses")
+Rel(player_repo, db, "Reads / Writes", "SQL")
+Rel(player_repo, player_entity, "Instantiates")
+
+@enduml

@@ -3,11 +3,9 @@
 
 title Trading Card Game - System Context
 
-Person(player, "Player", "Plays a match against another player or against a computer opponent")
-System(tcg, "Trading Card Game", "Runs matches (player vs player or player vs computer): health, mana, deck, hand, turns, damage and win conditions")
-System_Ext(idp, "Identity Provider", "Authenticates players")
+Person(player, "Player", "Registers, logs in, and plays matches against another player or a computer opponent")
+System(tcg, "Trading Card Game", "Handles player registration and login, runs matches (player vs player or player vs computer): health, mana, deck, hand, turns, damage and win conditions")
 
-Rel(player, tcg, "Plays matches using", "HTTPS")
-Rel(tcg, idp, "Authenticates players via", "OAuth2/JWT")
+Rel(player, tcg, "Registers, logs in, and plays matches using", "HTTPS")
 
 @enduml

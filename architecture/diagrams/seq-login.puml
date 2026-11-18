@@ -1,0 +1,27 @@
+@startuml seq-login
+title Player Login
+
+actor Player
+participant "React SPA" as SPA
+participant "Flask API\nAuth Blueprint" as API
+participant "AuthService" as AS
+participant "PlayerRepository" as PR
+participant "TokenService" as TS
+database "SQLite" as DB
+
+Player -> SPA : Enter username + password\nand submit
+SPA -> API : POST /auth/login\n{username, password}
+API -> AS : login(username, password)
+AS -> PR : find_by_username(username)
+PR -> DB : SELECT FROM players WHERE username = ?
+DB --> PR : row
+PR --> AS : Player entity
+AS -> AS : bcrypt.verify(password,\nhashed_password)
+AS -> TS : issue_token(player_id)
+TS --> AS : signed JWT (HS256,\nexp = now + 24h)
+AS --> API : token
+API --> SPA : 200 OK\n{token}
+SPA -> SPA : Store token in memory
+SPA --> Player : Redirect to lobby
+
+@enduml

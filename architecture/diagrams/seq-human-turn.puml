@@ -1,0 +1,103 @@
+@startuml seq-human-turn
+title Human Player Turn (Two-Phase Flow, PvP)
+
+actor "Active Player\n(P1)" as P1
+actor "Opponent Player\n(P2)" as P2
+participant "P1's Browser\n(React SPA)" as SPA1
+participant "P2's Browser\n(React SPA)" as SPA2
+participant "Flask API\nMatch Blueprint" as API
+participant "MatchService" as MS
+participant "TurnEngine" as TE
+participant "MatchRepository" as MR
+database "SQLite" as DB
+
+note over P1, DB
+  Precondition: it is P1's turn; match status = ACTIVE, phase = PLAY.
+  P1 has already seen their hand and mana. P2 is waiting and polling.
+end note
+
+== Phase 2: Card Play (P1 plays one card) ==
+
+P1 -> SPA1 : Click card to play
+SPA1 -> API : POST /matches/{id}/cards\n{card_index: N}\nAuthorization: Bearer <jwt>
+API -> API : Verify JWT → player_id (P1)
+API -> MS : play_card(match_id, player_id, card_index)
+MS -> MR : load(match_id)
+MR -> DB : SELECT FROM matches WHERE id = ?
+DB --> MR : row (JSON)
+MR --> MS : Match aggregate
+MS -> MS : Verify phase = PLAY\nand active player = P1
+MS -> TE : play_card(match, card)
+note right of TE
+  1. Verify mana >= card cost
+  2. Deduct mana
+  3. Damage = mana_cost
+     (0-cost → Dud, no damage)
+  4. Raise CardPlayed, PlayerDamaged
+  5. Check win condition:
+     if P2 health <= 0 →
+     raise GameWon,
+     set status = FINISHED
+end note
+TE --> MS : updated Match
+MS -> MR : save(match)
+MR -> DB : UPDATE matches SET state = ?
+DB --> MR : ok
+MS --> API : match state
+API --> SPA1 : 200 OK {match_state}
+SPA1 --> P1 : Update opponent health,\nremaining mana
+
+== End of P1's Turn / Start of P2's Turn ==
+
+P1 -> SPA1 : Click "End Turn"
+SPA1 -> API : POST /matches/{id}/end-turn\nAuthorization: Bearer <jwt>
+API -> API : Verify JWT → player_id (P1)
+API -> MS : end_turn(match_id, player_id)
+MS -> MR : load(match_id)
+MR -> DB : SELECT FROM matches WHERE id = ?
+DB --> MR : row (JSON)
+MR --> MS : Match aggregate
+MS -> MS : Verify active player = P1
+MS -> TE : end_turn(match)
+note right of TE
+  Emit TurnEnded for P1
+  Advance active player → P2
+end note
+TE --> MS : updated Match (active = P2)
+
+MS -> TE : begin_turn(match)
+note right of TE
+  P2's start-of-turn:
+  1. Gain mana slot (max 10)
+  2. Refill mana
+  3. Draw card:
+     - Empty deck → BleedingOut (P2 -1 HP)
+       then check win condition:
+       if P2 health <= 0 →
+       raise GameWon,
+       set status = FINISHED
+     - Hand full (5) → CardDiscarded
+  If not finished: set phase = PLAY
+end note
+TE --> MS : updated Match (P2 phase = PLAY\nor status = FINISHED)
+MS -> MR : save(match)
+MR -> DB : UPDATE matches SET state = ?
+DB --> MR : ok
+MS --> API : match state
+API --> SPA1 : 200 OK {match_state}
+SPA1 --> P1 : Show "Waiting for opponent"\n(or game over if FINISHED)
+
+== P2 discovers it is their turn (polling) ==
+
+SPA2 -> API : GET /matches/{id}\nAuthorization: Bearer <jwt>
+API -> MS : get_match(match_id, player_id)
+MS -> MR : load(match_id)
+MR -> DB : SELECT FROM matches WHERE id = ?
+DB --> MR : row (JSON)
+MR --> MS : Match aggregate
+MS -> MS : Verify player_id is a\nparticipant; omit opponent's hand
+MS --> API : match state (opponent hand hidden)
+API --> SPA2 : 200 OK {match_state\n active_player = P2}
+SPA2 --> P2 : Show P2's new hand,\nmana, and health
+
+@enduml
