@@ -1,0 +1,18 @@
+@startuml c4-container
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+title Trading Card Game - Container Diagram
+
+Person(player, "Player", "Registers, logs in, and plays matches")
+
+System_Boundary(tcg, "Trading Card Game") {
+    Container(spa, "React SPA", "React 18", "Renders the match UI; manages turn interactions and game state display")
+    Container(api, "Flask API", "Python 3.12 / Flask", "Routes HTTP requests; enforces authentication; runs all domain logic")
+    ContainerDb(db, "SQLite Database", "SQLite 3", "Stores player accounts and match state")
+}
+
+Rel(player, spa, "Uses", "HTTPS")
+Rel(spa, api, "Calls", "REST / JSON")
+Rel(api, db, "Reads / Writes", "SQL")
+
+@enduml
