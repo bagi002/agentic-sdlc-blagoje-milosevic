@@ -1,0 +1,28 @@
+@startuml deployment
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Deployment.puml
+
+title Trading Card Game - Deployment Diagram
+
+Deployment_Node(browser, "Player's Browser", "Any modern browser") {
+    Container(spa_browser, "React SPA", "React 18", "Served as static files; runs entirely in the browser after initial load")
+}
+
+Deployment_Node(host, "Host Machine", "Docker Engine") {
+    Deployment_Node(compose, "Docker Compose", "docker-compose.yml") {
+        Deployment_Node(spa_node, "spa container", "Nginx / Node 20") {
+            Container(spa_serve, "Static File Server", "Nginx", "Serves the built React SPA; reverse-proxies /api/* to the api container")
+        }
+        Deployment_Node(api_node, "api container", "Python 3.12") {
+            Container(api, "Flask API", "Gunicorn + Flask", "Handles all HTTP requests; runs domain logic; reads and writes the SQLite file on the mounted volume")
+        }
+    }
+    Deployment_Node(vol, "Docker Volume: tcg_data", "Named volume") {
+        ContainerDb(db, "tcg.db", "SQLite 3", "Single database file; persists player accounts and match state")
+    }
+}
+
+Rel(browser, spa_serve, "Requests static assets and API calls", "HTTPS :80")
+Rel(spa_serve, api, "Proxies /api/* to", "HTTP :5000 (internal)")
+Rel(api, db, "Reads / Writes", "SQLite file I/O (volume mount)")
+
+@enduml

@@ -1,0 +1,33 @@
+@startuml c4-component-game
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Trading Card Game - Game Context - Component Diagram
+
+Container(api_client, "Flask API", "Python 3.12 / Flask", "Entry point for all HTTP requests")
+ContainerDb(db, "SQLite Database", "SQLite 3", "matches table")
+
+Container_Boundary(game, "Game Bounded Context") {
+    Component(match_routes, "Match Blueprint", "Flask Blueprint", "Exposes GET /matches/{id}, POST /matches, POST /matches/{id}/join, POST /matches/{id}/cards, POST /matches/{id}/end-turn")
+    Component(match_service, "MatchService", "Python class", "Orchestrates match creation, joining, start-of-turn, card play, and end-of-turn; loads and saves state via repository")
+    Component(match_repo, "MatchRepository", "Python class", "Reads and writes the matches table; serialises and deserialises Match aggregates to JSON")
+    Component(turn_engine, "TurnEngine", "Python module", "Three pure functions: begin_turn (mana slot gain, mana refill, card draw, Bleeding Out / Overload, win check); play_card (mana deduction, damage, Dud rule, win check); end_turn (emits TurnEnded, advances active player)")
+    Component(computer_ai, "ComputerAI", "Python module", "Stateless loop: picks the single highest-cost affordable card, calls play_card, repeats until no card is affordable or game is won")
+    Component(match_aggregate, "Match", "Python dataclass", "Aggregate root: match_id, status (ACTIVE / FINISHED), PlayerState x 2, turn_number, phase (AWAITING_START / PLAY), domain events")
+    Component(player_state, "PlayerState", "Python dataclass", "Value object: health, mana_slots, mana, deck, hand")
+    Component(card, "Card", "Python dataclass", "Value object: mana_cost")
+}
+
+Rel(api_client, match_routes, "Routes /matches/* to")
+Rel(match_routes, match_service, "Calls")
+Rel(match_service, match_repo, "Loads / saves Match via")
+Rel(match_service, turn_engine, "Delegates begin_turn, play_card, end_turn to")
+Rel(match_service, computer_ai, "Drives AI turn via")
+Rel(match_repo, db, "Reads / Writes", "SQL + JSON")
+Rel(match_repo, match_aggregate, "Instantiates")
+Rel(match_aggregate, player_state, "Contains 2x")
+Rel(player_state, card, "Contains N x")
+Rel(turn_engine, match_aggregate, "Reads and returns updated")
+Rel(computer_ai, turn_engine, "Calls play_card and end_turn via")
+Rel(computer_ai, player_state, "Reads to select next card")
+
+@enduml

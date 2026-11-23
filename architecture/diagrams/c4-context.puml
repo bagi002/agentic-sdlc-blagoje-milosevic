@@ -1,0 +1,11 @@
+@startuml c4-context
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+
+title Trading Card Game - System Context
+
+Person(player, "Player", "Registers, logs in, and plays matches against another player or a computer opponent")
+System(tcg, "Trading Card Game", "Handles player registration and login, runs matches (player vs player or player vs computer): health, mana, deck, hand, turns, damage and win conditions")
+
+Rel(player, tcg, "Registers, logs in, and plays matches using", "HTTPS")
+
+@enduml

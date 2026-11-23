@@ -1,0 +1,27 @@
+@startuml seq-registration
+title Player Registration
+
+actor Player
+participant "React SPA" as SPA
+participant "Flask API\nAuth Blueprint" as API
+participant "AuthService" as AS
+participant "PlayerRepository" as PR
+database "SQLite" as DB
+
+Player -> SPA : Fill in username + password\nand submit
+SPA -> API : POST /auth/register\n{username, password}
+API -> AS : register(username, password)
+AS -> PR : find_by_username(username)
+PR -> DB : SELECT FROM players WHERE username = ?
+DB --> PR : empty result
+PR --> AS : None (username free)
+AS -> AS : bcrypt.hash(password)
+AS -> PR : save(Player)
+PR -> DB : INSERT INTO players
+DB --> PR : ok
+PR --> AS : player_id
+AS --> API : player_id
+API --> SPA : 201 Created\n{player_id}
+SPA --> Player : "Registration successful"
+
+@enduml

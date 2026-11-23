@@ -1,0 +1,117 @@
+@startuml seq-computer-turn
+title Computer Opponent Turn (PvC — runs inside the human's end-turn request)
+
+actor "Human Player" as Human
+participant "Human's Browser\n(React SPA)" as SPA
+participant "Flask API\nMatch Blueprint" as API
+participant "MatchService" as MS
+participant "TurnEngine" as TE
+participant "ComputerAI" as AI
+participant "MatchRepository" as MR
+database "SQLite" as DB
+
+Human -> SPA : Click "End Turn"
+SPA -> API : POST /matches/{id}/end-turn\nAuthorization: Bearer <jwt>
+API -> API : Verify JWT → player_id (Human)
+API -> MS : end_turn(match_id, player_id)
+MS -> MR : load(match_id)
+MR -> DB : SELECT FROM matches WHERE id = ?
+DB --> MR : row (JSON)
+MR --> MS : Match aggregate
+
+== End Human's Turn ==
+
+MS -> TE : end_turn(match)
+note right of TE
+  Emit TurnEnded for Human
+  Advance active player → Computer
+end note
+TE --> MS : updated Match (active = Computer)
+
+== Computer's Start of Turn ==
+
+MS -> TE : begin_turn(match)
+note right of TE
+  1. Gain mana slot (max 10)
+  2. Refill mana
+  3. Draw card (Bleeding Out /
+     Overload rules apply)
+  4. Check win condition:
+     if Bleeding Out reduced
+     Computer health <= 0 →
+     raise GameWon,
+     set status = FINISHED
+  If not finished: set phase = PLAY
+end note
+TE --> MS : updated Match
+
+alt status = FINISHED (Computer lost to Bleeding Out)
+    MS -> MR : save(match)
+    MR -> DB : UPDATE matches SET state = ?
+    DB --> MR : ok
+    MS --> API : match state
+    API --> SPA : 200 OK {match_state, status = FINISHED}
+    SPA --> Human : Show game over
+else status = ACTIVE
+    == Computer's Card Play (one card at a time) ==
+
+    loop
+        MS -> AI : next_card(computer_player_state)
+        note right of AI
+          Find the highest-cost card
+          with cost <= current mana.
+          Return None if none affordable.
+        end note
+        alt next_card returns None
+            AI --> MS : None
+            MS -> MS : exit loop
+        else next_card returns a Card
+            AI --> MS : Card
+            MS -> TE : play_card(match, card)
+            note right of TE
+              1. Deduct mana
+              2. Deal damage (Dud if cost = 0)
+              3. Raise CardPlayed, PlayerDamaged
+              4. Check win condition:
+                 if Human health <= 0 →
+                 raise GameWon,
+                 set status = FINISHED
+            end note
+            TE --> MS : updated Match
+        end
+    end
+
+    == End Computer's Turn / Start Human's Turn ==
+
+    MS -> TE : end_turn(match)
+    note right of TE
+      Emit TurnEnded for Computer
+      Advance active player → Human
+    end note
+    TE --> MS : updated Match (active = Human)
+
+    MS -> TE : begin_turn(match)
+    note right of TE
+      Human's start-of-turn:
+      1. Gain mana slot (max 10)
+      2. Refill mana
+      3. Draw card (Bleeding Out /
+         Overload rules apply)
+      4. Check win condition:
+         if Bleeding Out reduced
+         Human health <= 0 →
+         raise GameWon,
+         set status = FINISHED
+      If not finished: set phase = PLAY
+    end note
+    TE --> MS : updated Match (Human phase = PLAY\nor status = FINISHED)
+
+    MS -> MR : save(match)
+    MR -> DB : UPDATE matches SET state = ?
+    DB --> MR : ok
+    MS --> API : match state
+    API --> SPA : 200 OK {match_state}\n(contains Human's new hand and mana,\nor game over if FINISHED)
+    SPA --> Human : Show updated hand,\nmana, and health (or game over)
+end
+
+@enduml
