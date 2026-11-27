@@ -20,7 +20,7 @@
 | ID | Title | Domain | Criteria met |
 |----|-------|--------|--------------|
 | IDENTITY-STORY-001 | Player Registration | Identity | MVP · blocks IDENTITY-002 + all GAME · no account = nothing works · Auth Blueprint + AuthService + PlayerRepository + bcrypt + SQLite |
-| IDENTITY-STORY-002 | Player Login & JWT Issuance | Identity | MVP · blocks all GAME · no token = no match actions · TokenService + JWT + require_auth |
+| IDENTITY-STORY-002 | Player Login & JWT Issuance | Identity | MVP · blocks all GAME · no token = no match actions · TokenService + JWT |
 | GAME-STORY-004 | Play a Card (mana deduction + damage) | Game | MVP · blocks GAME-005/006–009 · highest gameplay value · TurnEngine.play_card + MatchService + MatchRepository + CardPlayed + PlayerDamaged events |
 
 ### Supporting Stories (~80% → ~20% incremental value)
